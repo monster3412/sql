@@ -1,0 +1,523 @@
+
+DROP DATABASE IF EXISTS coffee_shop_bi;
+CREATE DATABASE coffee_shop_bi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE coffee_shop_bi;
+
+CREATE TABLE points (
+    point_id VARCHAR(3) PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    address VARCHAR(100) NOT NULL,
+    license_status VARCHAR(10) DEFAULT 'Активна'
+);
+
+CREATE TABLE categories (
+    cat_id VARCHAR(3) PRIMARY KEY,
+    name VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE suppliers (
+    sup_id VARCHAR(3) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE employees (
+    emp_id VARCHAR(6) PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    login VARCHAR(50) UNIQUE NOT NULL,
+    pass_hash VARCHAR(64) NOT NULL
+);
+
+
+CREATE TABLE storage_locations (
+    loc_id VARCHAR(4) PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    point_id VARCHAR(3) NOT NULL,
+    FOREIGN KEY (point_id) REFERENCES points(point_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE products (
+    prod_id VARCHAR(6) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    unit VARCHAR(10) NOT NULL,
+    cat_id VARCHAR(3) NOT NULL,
+    FOREIGN KEY (cat_id) REFERENCES categories(cat_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE shifts (
+    shift_id VARCHAR(8) PRIMARY KEY,
+    point_id VARCHAR(3) NOT NULL,
+    open_date DATETIME NOT NULL,
+    close_date DATETIME,
+    status VARCHAR(10) DEFAULT 'Активна',
+    cash_balance DECIMAL(12,2) DEFAULT 0.00,
+    shift_target DECIMAL(12,2) DEFAULT 0.00,
+    tips_sum DECIMAL(12,2) DEFAULT 0.00,
+    FOREIGN KEY (point_id) REFERENCES points(point_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE menu (
+    menu_id VARCHAR(6) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2) NOT NULL
+);
+
+-- Связь многие-ко-многим: меню ↔ товары (рецептура)
+CREATE TABLE recipes (
+    menu_id VARCHAR(6),
+    prod_id VARCHAR(6),
+    qty DECIMAL(10,3) NOT NULL,
+    PRIMARY KEY (menu_id, prod_id),
+    FOREIGN KEY (menu_id) REFERENCES menu(menu_id) ON DELETE CASCADE,
+    FOREIGN KEY (prod_id) REFERENCES products(prod_id) ON DELETE RESTRICT
+);
+
+
+CREATE TABLE warehouse_ops (
+    op_id VARCHAR(10) PRIMARY KEY,
+    shift_id VARCHAR(8) NOT NULL,
+    prod_id VARCHAR(6) NOT NULL,
+    loc_id VARCHAR(4) NOT NULL,
+    menu_id VARCHAR(6),
+    emp_id VARCHAR(6) NOT NULL,
+    op_date DATE NOT NULL,
+    op_type VARCHAR(30) NOT NULL,
+    op_reason VARCHAR(30),
+    comment VARCHAR(200),
+    qty DECIMAL(10,3) NOT NULL,
+    price_per_unit DECIMAL(10,2),
+    sup_id VARCHAR(3),
+    expiry_date DATE,
+    FOREIGN KEY (shift_id) REFERENCES shifts(shift_id) ON DELETE RESTRICT,
+    FOREIGN KEY (prod_id) REFERENCES products(prod_id) ON DELETE RESTRICT,
+    FOREIGN KEY (loc_id) REFERENCES storage_locations(loc_id) ON DELETE RESTRICT,
+    FOREIGN KEY (menu_id) REFERENCES menu(menu_id) ON DELETE RESTRICT,
+    FOREIGN KEY (emp_id) REFERENCES employees(emp_id) ON DELETE RESTRICT,
+    FOREIGN KEY (sup_id) REFERENCES suppliers(sup_id) ON DELETE RESTRICT
+);
+
+
+ALTER TABLE employees ADD COLUMN hire_date DATE;
+
+ALTER TABLE products ADD COLUMN is_active TINYINT(1) DEFAULT 1;
+
+
+INSERT INTO points VALUES 
+('001', 'Кофейня №1', 'г. Белгород, ул. Свято-Троицкая, 43', 'Активна'),
+('002', 'Кофейня №2', 'г. Белгород, ул. Гагарина, 15', 'Активна'),
+('003', 'Кофейня №3', 'г. Курск, ул. Ленина, 7', 'Истекла');
+
+INSERT INTO categories VALUES 
+('K01', 'Ингредиенты'),
+('K02', 'Расходники'),
+('K03', 'Покупная продукция');
+
+INSERT INTO suppliers VALUES 
+('P01', 'ООО "Ресторансервис"', '+7(495)123-45-67'),
+('P02', 'ООО "Metro"', '+7(495)987-65-43'),
+('P03', 'АПХ "Мираторг"', '+7(4722)40-10-20');
+
+INSERT INTO employees (emp_id, full_name, role, login, pass_hash, hire_date) VALUES 
+('001001', 'Усмонова Н.А.', 'Бариста', 'usmonova@coffee.ru', SHA2('Barista2026!', 256), '2025-01-15'),
+('001002', 'Ремнев А.И.', 'Администратор', 'remnev@coffee.ru', SHA2('Admin2026!', 256), '2024-08-10'),
+('001003', 'Биньковская О.В.', 'Бариста', 'binkovskaya@coffee.ru', SHA2('Barista2026!', 256), '2025-06-01');
+
+INSERT INTO storage_locations VALUES 
+('S001', 'Склад', '001'),
+('S002', 'Холодильник', '001'),
+('S003', 'Барная стойка', '001'),
+('S004', 'Склад', '002');
+
+INSERT INTO products (prod_id, name, unit, cat_id, is_active) VALUES 
+('T001', 'Кофе зерновой', 'кг', 'K01', 1),
+('T002', 'Молоко 3,2%', 'л', 'K01', 1),
+('T003', 'Чай черный Althaus', 'уп', 'K01', 1),
+('T004', 'Стакан бумажный 0.3л', 'шт', 'K02', 1),
+('T005', 'Салфетки бумажные', 'уп', 'K02', 1),
+('T006', 'Фреш апельсиновый', 'шт', 'K03', 1);
+
+INSERT INTO shifts VALUES 
+('00000001', '001', '2026-10-15 08:00:00', '2026-10-15 20:00:00', 'Закрыта', 18450.00, 20000.00, 1200.00),
+('00000002', '001', '2026-10-16 08:00:00', NULL, 'Активна', 5000.00, 20000.00, 0.00),
+('00000003', '002', '2026-10-16 08:00:00', '2026-10-16 16:00:00', 'Закрыта', 12000.00, 15000.00, 800.00);
+
+INSERT INTO menu VALUES 
+('M001', 'Капучино 0.3 л', 250.00),
+('M002', 'Чёрный чай 0.5 л', 180.00),
+('M003', 'Фреш апельсиновый', 300.00);
+
+
+INSERT INTO recipes VALUES 
+('M001', 'T001', 0.018),   -- Капучино = 18г кофе + 200мл молока + 1 стакан
+('M001', 'T002', 0.200),
+('M001', 'T004', 1.000),
+('M002', 'T003', 0.002),   -- Чай = 1 пакетик + 1 стакан
+('M002', 'T004', 1.000);
+
+
+INSERT INTO warehouse_ops VALUES 
+('OP000001', '00000001', 'T001', 'S001', NULL, '001001', '2026-10-15', 'Приход', NULL, 'Плановая поставка', 1.500, 970.00, 'P01', NULL),
+('OP000002', '00000001', 'T002', 'S002', NULL, '001001', '2026-10-15', 'Приход', NULL, 'Плановая поставка', 20.000, 69.70, 'P02', '2026-10-18'),
+('OP000003', '00000001', 'T001', 'S002', 'M001', '001001', '2026-10-15', 'Списание по рецептуре', NULL, NULL, 0.018, 970.00, NULL, NULL),
+('OP000004', '00000001', 'T002', 'S002', NULL, '001001', '2026-10-15', 'Списание', 'Просрочка', 'Молоко с истёкшим сроком', 2.000, 69.70, NULL, '2026-10-14'),
+('OP000005', '00000002', 'T005', 'S001', NULL, '001001', '2026-10-16', 'Инвентаризация', 'Недостача', 'Пересчёт остатков', 1.000, 45.00, NULL, NULL),
+('OP000006', '00000003', 'T001', 'S004', NULL, '001003', '2026-10-16', 'Приход', NULL, NULL, 3.000, 980.00, 'P01', NULL),
+('OP000007', '00000003', 'T002', 'S004', NULL, '001003', '2026-10-16', 'Приход', NULL, NULL, 15.000, 71.00, 'P02', '2026-10-20');
+
+
+
+UPDATE shifts 
+SET cash_balance = 18600.00, 
+    status = 'Проверена',
+    close_date = '2026-10-15 20:15:00'
+WHERE shift_id = '00000001';
+
+
+DELETE FROM warehouse_ops WHERE op_id = 'OP999999';
+
+
+DROP USER IF EXISTS 'barista_user'@'localhost';
+CREATE USER 'barista_user'@'localhost' IDENTIFIED BY 'BaristaSecure2026!';
+
+
+GRANT SELECT ON coffee_shop_bi.products TO 'barista_user'@'localhost';
+GRANT SELECT ON coffee_shop_bi.menu TO 'barista_user'@'localhost';
+GRANT SELECT ON coffee_shop_bi.categories TO 'barista_user'@'localhost';
+GRANT SELECT ON coffee_shop_bi.storage_locations TO 'barista_user'@'localhost';
+
+
+GRANT SELECT, INSERT, UPDATE ON coffee_shop_bi.warehouse_ops TO 'barista_user'@'localhost';
+GRANT SELECT, UPDATE ON coffee_shop_bi.shifts TO 'barista_user'@'localhost';
+
+
+FLUSH PRIVILEGES;
+
+
+DESCRIBE points;
+DESCRIBE products;
+DESCRIBE warehouse_ops;
+
+
+
+-- БИЗНЕС-ЗАДАЧА: "Экран оформления заказа" (п.2 требований к результатам)
+-- Бариста выбирает позиции меню — нужно показать их с ценами, 
+-- отсортированные по убыванию цены (дорогие сверху)
+
+SELECT 
+    m.menu_id,
+    m.name AS menu_name,
+    m.price
+FROM menu m
+WHERE m.price > 0
+ORDER BY m.price DESC;
+
+
+-- БИЗНЕС-ЗАДАЧА: "Отчёт по закрытию смены" (п.6 требований)
+-- Показать все операции смены с полной детализацией: 
+-- кто, что, где, когда, в какой точке
+
+SELECT 
+    o.op_id,
+    o.op_date,
+    p.name AS product_name,
+    pt.name AS point_name,
+    e.full_name AS employee_name,
+    o.op_type,
+    o.qty,
+    o.op_reason
+FROM warehouse_ops o
+JOIN shifts s ON o.shift_id = s.shift_id
+JOIN points pt ON s.point_id = pt.point_id
+JOIN products p ON o.prod_id = p.prod_id
+JOIN employees e ON o.emp_id = e.emp_id
+WHERE s.shift_id = '00000001'
+ORDER BY o.op_date DESC;
+
+
+
+-- БИЗНЕС-ЗАДАЧА: "Главный экран смены / Дашборд бариста" (п.1 требований)
+-- Метрики вчерашней смены: заработано, чаевые, количество заказов
+
+SELECT 
+    SUM(o.qty * m.price) AS total_revenue,     -- общая выручка
+    COUNT(DISTINCT o.menu_id) AS orders_count, -- количество заказов
+    AVG(m.price) AS avg_check,                 -- средний чек
+    MAX(o.qty * m.price) AS max_single_order,  -- самый большой заказ
+    MIN(m.price) AS min_item_price,            -- самая дешёвая позиция
+    s.tips_sum                                 -- сумма чаевых
+FROM warehouse_ops o
+JOIN shifts s ON o.shift_id = s.shift_id
+JOIN menu m ON o.menu_id = m.menu_id
+WHERE o.shift_id = '00000001'
+  AND o.op_type = 'Реализация';
+
+
+-- БИЗНЕС-ЗАДАЧА: "Экран инвентаризации" (п.5 требований)
+-- Найти товары, по которым за смену было более 1 операции списания 
+-- (это товары, требующие особого внимания при инвентаризации)
+
+SELECT 
+    p.name AS product_name,
+    COUNT(o.op_id) AS ops_count,
+    SUM(o.qty) AS total_qty_moved
+FROM warehouse_ops o
+JOIN products p ON o.prod_id = p.prod_id
+WHERE o.op_type IN ('Списание', 'Списание по рецептуре')
+GROUP BY p.prod_id, p.name
+HAVING COUNT(o.op_id) > 1
+ORDER BY ops_count DESC;
+
+
+
+-- БИЗНЕС-ЗАДАЧА: "Получение и регистрация поставки" (п.4 операций)
+-- Подзапрос с IN: найти все операции товаров категории "Ингредиенты"
+-- (бариста принимает только ингредиенты от поставщиков)
+SELECT 
+    o.op_id,
+    p.name AS product_name,
+    o.op_type,
+    o.qty,
+    o.op_date
+FROM warehouse_ops o
+JOIN products p ON o.prod_id = p.prod_id
+WHERE p.cat_id IN (
+    SELECT cat_id FROM categories WHERE name = 'Ингредиенты'
+)
+ORDER BY o.op_date DESC;
+
+-- Подзапрос с ALL: найти операции прихода, где количество БОЛЬШЕ, 
+-- чем количество ЛЮБОЙ операции списания 
+-- (т.е. больше максимума списаний — крупные поставки)
+SELECT 
+    op_id,
+    prod_id,
+    qty,
+    op_date
+FROM warehouse_ops
+WHERE qty > ALL (
+    SELECT qty FROM warehouse_ops 
+    WHERE op_type IN ('Списание', 'Списание по рецептуре')
+)
+AND op_type = 'Приход';
+
+-- Подзапрос с EXISTS: найти сотрудников, у которых были операции 
+-- с просроченными товарами (для отчёта руководству)
+SELECT 
+    e.emp_id,
+    e.full_name,
+    e.role
+FROM employees e
+WHERE EXISTS (
+    SELECT 1 FROM warehouse_ops o 
+    WHERE o.emp_id = e.emp_id 
+      AND o.op_reason = 'Просрочка'
+);
+
+
+-- БИЗНЕС-ЗАДАЧА: "Дашборд бариста" — прогресс-бар цели на смену
+
+-- CASE: категоризация операций + оценка выполнения цели смены
+SELECT 
+    s.shift_id,
+    s.shift_target,
+    s.cash_balance,
+    CASE 
+        WHEN s.cash_balance >= s.shift_target THEN '✅ Цель выполнена'
+        WHEN s.cash_balance >= s.shift_target * 0.8 THEN '🟡 Почти выполнена'
+        WHEN s.cash_balance >= s.shift_target * 0.5 THEN '🟠 В процессе'
+        ELSE '🔴 Отстаём от графика'
+    END AS target_status,
+    ROUND(s.cash_balance / s.shift_target * 100, 1) AS progress_percent
+FROM shifts s;
+
+-- CASE в SELECT: понятные подписи для типов операций
+SELECT 
+    op_id,
+    op_type,
+    CASE op_type
+        WHEN 'Приход' THEN '📥 Поступление от поставщика'
+        WHEN 'Списание' THEN CONCAT('🗑️ Списание: ', COALESCE(op_reason, 'без причины'))
+        WHEN 'Списание по рецептуре' THEN '☕ Реализация по рецепту'
+        WHEN 'Инвентаризация' THEN CONCAT('📋 Инвентаризация: ', COALESCE(op_reason, ''))
+        ELSE '🔹 Прочее'
+    END AS operation_description,
+    qty
+FROM warehouse_ops
+ORDER BY op_date DESC;
+
+-- IF: направление движения товара (приход/расход)
+SELECT 
+    op_id,
+    prod_id,
+    qty,
+    IF(op_type = 'Приход', qty, -qty) AS signed_qty,  -- приход "+", расход "-"
+    IF(op_type = 'Приход', 'Поступление', 'Расход') AS flow_direction
+FROM warehouse_ops;
+
+
+-- БИЗНЕС-ЗАДАЧА: "Главный экран смены" — готовое представление 
+-- с полной информацией об операциях
+-- Постоянное представление: сводка всех операций (самый популярный запрос)
+
+CREATE VIEW v_ops_full_info AS
+SELECT 
+    o.op_id,
+    o.op_date,
+    o.op_type,
+    p.name AS product_name,
+    c.name AS category_name,
+    pt.name AS point_name,
+    e.full_name AS employee_name,
+    sl.name AS location_name,
+    o.qty,
+    o.price_per_unit,
+    o.qty * o.price_per_unit AS total_sum,
+    o.op_reason,
+    o.comment
+FROM warehouse_ops o
+JOIN products p ON o.prod_id = p.prod_id
+JOIN categories c ON p.cat_id = c.cat_id
+JOIN shifts s ON o.shift_id = s.shift_id
+JOIN points pt ON s.point_id = pt.point_id
+JOIN employees e ON o.emp_id = e.emp_id
+JOIN storage_locations sl ON o.loc_id = sl.loc_id;
+
+
+SELECT * FROM v_ops_full_info WHERE op_type = 'Приход';
+
+-- WITH (CTE): расчёт выручки по каждой смене для отчёта закрытия
+WITH shift_revenue AS (
+    SELECT 
+        s.shift_id,
+        s.point_id,
+        pt.name AS point_name,
+        s.open_date,
+        s.close_date,
+        s.shift_target,
+        s.cash_balance,
+        s.tips_sum,
+        COALESCE(SUM(o.qty * m.price), 0) AS calculated_revenue,
+        COUNT(DISTINCT o.menu_id) AS orders_count
+    FROM shifts s
+    JOIN points pt ON s.point_id = pt.point_id
+    LEFT JOIN warehouse_ops o ON s.shift_id = o.shift_id AND o.op_type = 'Реализация'
+    LEFT JOIN menu m ON o.menu_id = m.menu_id
+    GROUP BY s.shift_id, s.point_id, pt.name, s.open_date, s.close_date, 
+             s.shift_target, s.cash_balance, s.tips_sum
+)
+SELECT 
+    shift_id,
+    point_name,
+    open_date,
+    close_date,
+    shift_target,
+    calculated_revenue,
+    cash_balance,
+    tips_sum,
+    orders_count,
+    ROUND(calculated_revenue / NULLIF(shift_target, 0) * 100, 1) AS target_percent
+FROM shift_revenue
+ORDER BY open_date DESC;
+
+
+-- БИЗНЕС-ЗАДАЧА: ускорение поиска операций по товару и дате 
+-- (частый запрос на экране инвентаризации)
+
+
+
+EXPLAIN SELECT * FROM warehouse_ops 
+WHERE prod_id = 'T001' AND op_date > '2026-10-01';
+-- Ожидаем type: ALL (полный перебор) — медленно!
+
+-- Создаём индексы для частых запросов
+CREATE INDEX idx_ops_prod ON warehouse_ops(prod_id);
+CREATE INDEX idx_ops_date ON warehouse_ops(op_date);
+CREATE INDEX idx_ops_type ON warehouse_ops(op_type);
+CREATE INDEX idx_ops_shift ON warehouse_ops(shift_id);
+CREATE INDEX idx_products_cat ON products(cat_id);
+
+
+CREATE INDEX idx_ops_prod_date ON warehouse_ops(prod_id, op_date);
+
+
+EXPLAIN SELECT * FROM warehouse_ops 
+WHERE prod_id = 'T001' AND op_date > '2026-10-01';
+
+
+
+
+-- БИЗНЕС-ЗАДАЧА: "Оформление заказа гостя" (п.3 операций)
+-- При продаже капучино нужно АТОМАРНО:
+--   1) Создать запись "Реализация" для позиции меню
+--   2) Создать записи "Списание по рецептуре" для каждого ингредиента
+-- Если что-то пойдёт не так — откатить всё!
+
+START TRANSACTION;
+
+
+INSERT INTO warehouse_ops 
+(op_id, shift_id, prod_id, loc_id, menu_id, emp_id, op_date, op_type, qty, price_per_unit)
+VALUES 
+('OP000020', '00000002', 'T001', 'S002', 'M001', '001001', '2026-10-16', 'Реализация', 1.000, 250.00);
+
+
+INSERT INTO warehouse_ops 
+(op_id, shift_id, prod_id, loc_id, menu_id, emp_id, op_date, op_type, qty, price_per_unit)
+VALUES 
+('OP000021', '00000002', 'T001', 'S002', 'M001', '001001', '2026-10-16', 'Списание по рецептуре', 0.018, 970.00);
+
+
+INSERT INTO warehouse_ops 
+(op_id, shift_id, prod_id, loc_id, menu_id, emp_id, op_date, op_type, qty, price_per_unit)
+VALUES 
+('OP000022', '00000002', 'T002', 'S002', 'M001', '001001', '2026-10-16', 'Списание по рецептуре', 0.200, 69.70);
+
+
+INSERT INTO warehouse_ops 
+(op_id, shift_id, prod_id, loc_id, menu_id, emp_id, op_date, op_type, qty, price_per_unit)
+VALUES 
+('OP000023', '00000002', 'T004', 'S002', 'M001', '001001', '2026-10-16', 'Списание по рецептуре', 1.000, 15.00);
+
+
+COMMIT;
+
+-- Альтернативный сценарий: откат при ошибке (например, не хватает товара)
+START TRANSACTION;
+
+INSERT INTO warehouse_ops 
+(op_id, shift_id, prod_id, loc_id, menu_id, emp_id, op_date, op_type, qty)
+VALUES 
+('OP000030', '00000002', 'T001', 'S002', 'M001', '001001', '2026-10-16', 'Реализация', 1.000);
+
+
+ROLLBACK;
+
+
+SELECT * FROM warehouse_ops WHERE op_id = 'OP000030';
+
+
+
+-- БИЗНЕС-ЗАДАЧА: "Добавление списания товара" (п.5 операций)
+-- Параметризованный запрос для разных причин списания
+
+
+PREPARE stmt_write_offs_by_reason FROM 
+    'SELECT o.op_id, p.name AS product_name, o.qty, o.op_reason, o.comment, o.op_date
+     FROM warehouse_ops o
+     JOIN products p ON o.prod_id = p.prod_id
+     WHERE o.op_type = "Списание" AND o.op_reason = ?
+     ORDER BY o.op_date DESC';
+
+
+SET @reason = 'Просрочка';
+EXECUTE stmt_write_offs_by_reason USING @reason;
+
+SET @reason = 'Брак';
+EXECUTE stmt_write_offs_by_reason USING @reason;
+
+SET @reason = 'Бой';
+EXECUTE stmt_write_offs_by_reason USING @reason;
+
+DEALLOCATE PREPARE stmt_write_offs_by_reason;
+
